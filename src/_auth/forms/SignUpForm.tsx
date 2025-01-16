@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 
 
 
@@ -11,12 +11,16 @@ import { Input } from "@/components/ui/input"
 import { SignUpValidationSchema } from "@/lib/validation"
 import { z } from "zod"
 import Loader from "@/components/shared/Loader"
-import { createUserAccount } from "@/lib/appwrite/api"
+import { useCreateUserAccount, useSignInAccount } from "@/lib/react-query/queriesAndMutations"
+import { useUserContext } from "@/context/AuthContext"
 
 const SignUpForm = () => {
 
-  const isLoading = false
+  const navigate = useNavigate()
   const { toast } = useToast()
+  const { checkAuthUser } = useUserContext()
+  const { mutateAsync: createUserAccount, isLoading: isCreatingAccount } = useCreateUserAccount()
+  const { mutateAsync: signInAccount } = useSignInAccount()
 
   const form = useForm<z.infer<typeof SignUpValidationSchema>>({
     resolver: zodResolver(SignUpValidationSchema),
@@ -37,7 +41,24 @@ const SignUpForm = () => {
       })
     }
 
-    // const session = await signInAccount()
+    const session = await signInAccount({
+      email: values.email,
+      password: values.password,
+    })
+
+    if(!session) {
+      return toast({title: 'Sign in failed. Please try again.'})
+    }
+
+    const isLoggedIn = await checkAuthUser()
+
+    if(isLoggedIn) {
+      form.reset()
+
+      navigate('/')
+    } else {
+      return toast({title: 'Sign up failed. Please try again.'})
+    }
   }
 
   return (
@@ -101,9 +122,9 @@ const SignUpForm = () => {
             )}
           />
           <Button className="shad-button_primary" type="submit">
-            {isLoading ? (
+            {isCreatingAccount ? (
               <div className="flex-center gap-2"><Loader /> Loading...</div>
-            ) : "Sign Up"}
+            ) : "Sign up"}
           </Button>
 
           <p className="text-small-regular text-light-2 text-center mt-2">
